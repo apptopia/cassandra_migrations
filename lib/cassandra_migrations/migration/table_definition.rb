@@ -52,6 +52,11 @@ module CassandraMigrations
         cql
       end
 
+      def blob(column_name, options={})
+        @columns_name_type_hash[column_name.to_sym] = column_type_for(:blob, options)
+        raise Errors::MigrationDefinitionError, "blob cannot be primary key" if options[:primary_key]
+      end
+
       def boolean(column_name, options={})
         @columns_name_type_hash[column_name.to_sym] = column_type_for(:boolean, options)
         define_primary_keys(column_name) if options[:primary_key]
@@ -152,7 +157,7 @@ module CassandraMigrations
         def column_type_for(ruby_type, options={})
           limit = options[:limit]
           case ruby_type
-            when :boolean, :text, :timestamp, :uuid, :timeuuid
+            when :boolean, :text, :timestamp, :uuid, :timeuuid, :blob
               ruby_type
             when :integer
               if limit.nil? || limit == 4
