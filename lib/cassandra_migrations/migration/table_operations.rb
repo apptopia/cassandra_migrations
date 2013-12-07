@@ -30,7 +30,7 @@ module CassandraMigrations
         create_cql << ")"
 
         if options[:clustering_order]
-          create_sql << " WITH CLUSTERING ORDER BY (#{options[:clustering_order]})"
+          create_cql << " WITH CLUSTERING ORDER BY (#{options[:clustering_order]})"
         end
 
         announce_suboperation create_cql
