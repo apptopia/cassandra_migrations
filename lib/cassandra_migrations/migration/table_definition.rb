@@ -67,6 +67,11 @@ module CassandraMigrations
         define_primary_keys(column_name) if options[:primary_key]
       end
 
+      def counter(column_name, options={})
+        @columns_name_type_hash[column_name.to_sym] = column_type_for(:counter, options)
+        define_primary_keys(column_name) if options[:primary_key]
+      end
+
       def float(column_name, options={})
         @columns_name_type_hash[column_name.to_sym] = column_type_for(:float, options)
         define_primary_keys(column_name) if options[:primary_key]
@@ -180,6 +185,8 @@ module CassandraMigrations
               else
                 raise Errors::MigrationDefinitionError, ':limit option should be 4 or 8 for floats.'
               end
+            when :counter
+              :counter
             when :decimal
               :decimal
             when :string
