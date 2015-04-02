@@ -16,6 +16,7 @@ module CassandraMigrations
       def initialize()
         @columns_name_type_hash = {}
         @primary_keys = []
+        @partition_keys = []
       end
 
       def to_create_cql
@@ -29,10 +30,15 @@ module CassandraMigrations
           raise Errors::MigrationDefinitionError, 'No columns defined for table.'
         end
 
-        if !@primary_keys.empty?
-          cql << "PRIMARY KEY (#{@primary_keys.join(', ')})"
+        raise Errors::MigrationDefinitionError, 'No primary key defined.' if @partition_keys.empty? && @primary_keys.empty?
+
+        ckeys = @primary_keys - @partition_keys
+        if !@partition_keys.empty? && !ckeys.empty?
+          cql << "PRIMARY KEY ((#{@partition_keys.join ','}), #{ckeys.join ','})"
+        elsif !@partition_keys.empty?
+          cql << "PRIMARY KEY ((#{@partition_keys.join ','}))"
         else
-          raise Errors::MigrationDefinitionError, 'No primary key defined.'
+          cql << "PRIMARY KEY (#{@primary_keys.join ','})"
         end
 
         cql.join(', ')
@@ -160,6 +166,14 @@ module CassandraMigrations
         end
 
         @primary_keys = keys.flatten
+      end
+
+      def define_partition_keys(*keys)
+        if !@partition_keys.empty?
+          raise Errors::MigrationDefinitionError, 'Primary key defined twice for the same table.'
+        end
+
+        @partition_keys = keys.flatten
       end
 
       private

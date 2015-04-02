@@ -20,6 +20,7 @@ module CassandraMigrations
       def create_table(table_name, options = {})
         table_definition = TableDefinition.new
         table_definition.define_primary_keys(options[:primary_keys]) if options[:primary_keys]
+        table_definition.define_partition_keys(options[:partition_keys]) if options[:partition_keys]
 
         yield table_definition if block_given?
 
@@ -29,9 +30,20 @@ module CassandraMigrations
         create_cql << table_definition.to_create_cql
         create_cql << ")"
 
+        cql_options_clause = []
+
         if options[:clustering_order]
-          create_cql << " WITH CLUSTERING ORDER BY (#{options[:clustering_order]})"
+          cql_options_clause << "CLUSTERING ORDER BY (#{options[:clustering_order]})"
         end
+
+        if options[:options]
+          options[:options].each {|name, value|
+            value_str = value.map {|k, v| "'#{k}':'#{v}'"}.join(',')
+            cql_options_clause << "#{name} = {#{value_str}}"
+          }
+        end
+
+        create_cql << " WITH #{cql_options_clause.join ' AND '}" if !cql_options_clause.empty?
 
         announce_suboperation create_cql
 
