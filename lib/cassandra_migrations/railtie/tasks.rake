@@ -76,9 +76,17 @@ namespace :cassandra do
 
   desc 'Retrieves the current schema version number'
   task :version => :start do
-    puts "Current version: #{CassandraMigrations::Migrator.read_current_version}"
+    puts "Current version: #{CassandraMigrations::Migrator.read_current_version_v2}"
   end
 
-  task
+  desc 'Show missing migrations'
+  task :missing => :start do
+    CassandraMigrations::Migrator.get_missing_migrations
+  end
+
+  desc 'Migrate to new schema of migrations'
+  task :migrate_to_v2 => :start do
+    CassandraMigrations::Migrator.migrate_to_v2
+  end
 
 end
