@@ -1,202 +1,218 @@
+# Cassandra Migrations
 [![Gem Version](https://badge.fury.io/rb/cassandra_migrations.png)](http://badge.fury.io/rb/cassandra_migrations)
+[![Code Climate](https://codeclimate.com/github/hsgubert/cassandra_migrations.png)](https://codeclimate.com/github/hsgubert/cassandra_migrations)
 
-Cassandra Migrations
-====================
+## Description
+Cassandra Migrations is a Cassandra database schema migration library for Rails applications.
 
-**Cassandra schema management for a multi-environment developer.**
+This gem provides:
+  * Multi-environment database configuration
+  * Versioned CQL schema migration management
+  * A schema modification DSL for simplified migration code
+  * Rake tasks for database schema management
+  * Support for forked processes
 
-A gem to manage Cassandra database schema for Rails. This gem offers migrations and environment specific databases out-of-the-box for Rails users.
+Use Cassandra in an organized and familiar way, without changing how you work with your ActiveRecord relational database schema.
 
-This enables you to use Cassandra in an organized way, combined with your ActiveRecord relational database.
+## Requirements
 
-# Requirements
+- Cassandra >= 1.2, using the native transport protocol
+- Ruby >= 1.9
+- Rails >= 3.2
 
-- Cassandra 1.2 or higher with the native_transport_protocol turned on ([Instructions to install cassandra locally](https://github.com/hsgubert/cassandra_migrations/wiki/Preparing-standalone-Cassandra-in-local-machine))
-- Ruby 1.9
-- Rails 3.2 _(not tested with Rails 4 yet, volunteers are welcome! ...and needed!)_
-
-# Installation
-
-    gem install cassandra_migrations
-
-# Quick start
-
-### Configure Cassandra
-
-The native transport protocol (sometimes called binary protocol, or CQL protocol) is not on by default in Cassandra 1.2, to enable it edit the `CASSANDRA_DIR/conf/cassandra.yaml` file on all nodes in your cluster and set `start_native_transport` to `true`. You need to restart the nodes for this to have effect.
-
-### Prepare Project
-
-In your rails root directory:
-
-    prepare_for_cassandra .
-    
-### Configuring cassandra access
-
-Open your newly-created `config/cassandra.yml` and configure the database name for each of the environments, just like you would do for your regular database. The other options defaults should be enough for now.
+## Installation
 
 ```ruby
+gem install cassandra_migrations
+```
+
+or, with bundler, add the following to your gemfile:
+
+```
+gem 'cassandra_migrations'
+```
+
+## Configuration
+
+Similar to how `config/database.yml` stores your relational databse configuration, `config/cassandra.yml` stores your cassandra database configuration.
+
+```
+rails g cassandra_configuration
+```
+
+This will create the `config/cassandra.yml` with default settings. Configure the database names for each of your environments.
+
+```yml
 development:
-  host: '127.0.0.1'
+  hosts:
+    - 127.0.0.1
   port: 9042
-  keyspace: 'my_keyspace_name'
+  keyspace: my_keyspace_dev
   replication:
-    class: 'SimpleStrategy'
+    class: SimpleStrategy
     replication_factor: 1
 ```
 
-### Create your database
+These are the minimum options to get started, for advanced configuration, read about [Database Configuration Options](wiki/Database Configuration Options).
 
-There are a collection of rake tasks to help you manage the cassandra database (`rake cassandra:create`, `rake cassandra:migrate`, `rake cassandra:drop`, etc.). For now this one does the trick:
+Assuming your Cassandra database is running, you may now create your keyspace:
 
-    rake cassandra:setup
+```bash
+rake cassandra:create
+```
 
-### Create a test table
+## Migrations
 
-    rails generate cassandra_migration create_posts
-    
-In your migration file, make it create a table and drop it on its way back:
+Similar to how `db/migrate/` stores your relational databse schema migration files, `db/cassandra_migrate/` stores your Cassandra schema migration files.
+
+``` bash
+rails g cassandra_migration create_posts
+```
+
+This will create a versioned migration in `db/cassandra_migrate/`, with familiar `up` and `down` methods that will be executed when applying or rolling back a migration, respectively.
 
 ```ruby
 class CreatePosts < CassandraMigrations::Migration
   def up
-    create_table :posts do |p|
-      p.integer :id, :primary_key => true
-      p.timestamp :created_at
-      p.string :title
-      p.text :text
-    end
   end
-  
-  def self.down
+
+  def down
+  end
+end
+```
+You may call `execute` from these methods to execute CQL statements to your configured keyspace.
+
+### Cassandra Migrations DSL
+
+For increased readability and ease of use, there is also a familiar DSL available from the migration methods.
+
+```ruby
+class CreatePosts < CassandraMigrations::Migration
+  def up
+    create_table :posts,
+                 partition_keys: [:id, :created_month],
+                 primary_keys:   [:created_at] do |t|
+      t.integer   :id
+      t.string    :created_month
+      t.timestamp :created_at
+      t.string    :title
+      t.string    :category
+      t.set       :tags, type: :float
+      t.map       :my_map, key_type: :uuid, value_type: :float
+      t.text      :content
+    end
+
+    create_index :posts, :category, name: 'posts_by_category'
+  end
+
+  def down
+    drop_index 'posts_by_category'
     drop_table :posts
   end
 end
 ```
 
-And now run:
+Use the following type methods for fields:
 
-    rake cassandra:migrate 
+* `text`
+* `integer`
+* `decimal`
+* `float`
+* `double`
+* `boolean`
+* `uuid`
+* `timeuuid`
+* `inet`
+* `timestamp`
+* `datetime`
+* `binary`
+* `list` (with `type` option)
+* `set` (with `type` option)
+* `map` (with `key_type` and `value_type` options)
 
-To create a table with compound primary key just specify the primary keys on table creation, i.e.:
+For more details on the DSL's types, advanced table options, keyspace manipulation, or other schema statment methods, read about the [Migration DSL](wiki/Migration DSL).
 
-```ruby
-class CreatePosts < CassandraMigrations::Migration
-  def up
-    create_table :posts, :primary_keys => [:id, :created_at] do |p|
-      p.integer :id
-      p.timestamp :created_at
-      p.string :title
-      p.text :text
-    end
-  end
-  
-  def self.down
-    drop_table :posts
-  end
-end
+### Rake Tasks
+
+There are a collection of familiar rake tasks to help you manage your cassandra databases.
+
+  * **`rake cassandra:create`** Creates the configured keyspace in `config/cassandra.yml`.
+  * **`rake cassandra:drop`** Drops the configured keyspace in `config/cassandra.yml`.
+  * **`rake cassandra:migrate`** Runs migrations that have not run yet.
+  * **`rake cassandra:rollback`** Rolls back the latest migration that has been applied.
+  * **`rake cassandra:migrate:reset`**  Runs `cassandra:drop`, `cassandra:create` and `cassandra:migrate`.
+
+Each rake task will be run against the database that is configured for the current environment (via `RAILS_ENV`).
+
+```
+rake cassandra:migrate
 ```
 
-There are some other helpers like `add_column` too.. take a look inside!
+```bash
 
-### Querying cassandra
+== CreatePosts: migrating =====================================================
+  create_table(posts)
+  -> CREATE TABLE posts (id int, created_month varchar, created_at timestamp, title varchar, category varchar, content text, PRIMARY KEY((id, created_month), created_at))
+  create_index(posts)
+  -> CREATE INDEX posts_by_category ON posts (category)
+== CreatePosts: migrated (0.3448s) ============================================
 
-There are two ways to use the cassandra interface provided by this gem
+Migrated 1 version(s) up.
+```
 
-#### 1. Acessing through query helpers
+For more details on available rake tasks and options, read about [Rake Tasks](wiki/Rake Tasks).
+
+## Query Helpers
+
+When a migration requires working with data, not just schema, one option is using the Cassandra Migration query classes.
 
 ```ruby
-# selects all posts
 CassandraMigrations::Cassandra.select(:posts)
-
-# more complex select query 
-CassandraMigrations::Cassandra.select(:posts, 
-  :projection => 'title, created_at',
-  :selection => 'id > 1234',
-  :order_by => 'created_at DESC',
-  :limit => 10
-)
-
-# adding a new post
-CassandraMigrations::Cassandra.write!(:posts, {
-  :id => 9999,
-  :created_at => Time.current,
-  :title => 'My new post',
-  :text => 'lorem ipsum dolor sit amet.'
-})
-
-# adding a new post with TTL
-CassandraMigrations::Cassandra.write!(:posts, 
-  {
-    :id => 9999,
-    :created_at => Time.current,
-    :title => 'My new post',
-    :text => 'lorem ipsum dolor sit amet.'
-  },
-  :ttl => 3600
-)
-
-# updating a post
-CassandraMigrations::Cassandra.update!(:posts, 'id = 9999', 
-  :title => 'Updated title'
-)
-
-# updating a post with TTL
-CassandraMigrations::Cassandra.update!(:posts, 'id = 9999', 
-  { :title => 'Updated title' },
-  :ttl => 3600
-)
-
-# deleting a post
-CassandraMigrations::Cassandra.delete!(:posts, 'id = 1234')
-
-# deleting a post title
-CassandraMigrations::Cassandra.delete!(:posts, 'id = 1234'
-  :projection => 'title'
-)
-
-# deleting all posts
-CassandraMigrations::Cassandra.truncate!(:posts)
 ```
 
-#### 2. Using raw CQL3
-
 ```ruby
-CassandraMigrations::Cassandra.execute('SELECT * FROM posts')
-```
+new posts = CassandraMigrations::Cassandra.select(:posts,
+  projection: 'title, created_at',
+  selection: 'id > 1234',
+  order_by: 'created_at DESC',
+  limit: 10
+)
 
-### Reading query results
-
-Select queries will return an enumerable object over which you can iterate. All other query types return `nil`.
-
-```ruby
-CassandraMigrations::Cassandra.select(:posts).each |post_attributes|
-  puts post_attributes
+new_posts.each do |post|
+  CassandraMigrations::Cassandra.update!(:posts,
+    "id = #{post['id']}",
+    {tags: ['new']},
+    {operations: {tags: :+}})
 end
-
-# => {'id' => 9999, 'created_at' => 2013-05-20 18:43:23 -0300, 'title' => 'My new post', 'text' => 'lorem ipsum dolor sit amet.'}
 ```
 
-If your want some info about the table metadata just call it on a query result:
-```ruby
-CassandraMigrations::Cassandra.select(:posts).metadata
+For more details, options, and examples, read about the [Query Helpers](wiki/Query Helpers).
 
-# => {'id' => :integer, 'created_at' => :timestamp, 'title' => :varchar, 'text' => :varchar}
+
+## Deployment
+
+### Passenger
+
+Cassandra Migrations has built-in support for Passenger's forked process model (e.g. smart spawning).
+
+### Other forked web servers (Puma, Unicorn, etc.)
+
+Each fork should contain its own session to avoid deadlock and other issues. Restart the connection after the process has forked.
+
+```
+# config/puma.rb
+on_worker_boot do
+  # re-establish the connection in this process fork
+  CassandraMigrations::Cassandra.restart
+end
 ```
 
-### Using uuid data type
+### Capistrano
 
-Please refer to the wiki: [Using uuid data type](https://github.com/hsgubert/cassandra_migrations/wiki/Using-uuid-data-type)
-
-### Deploy integration with Capistrano
-
-This gem comes with built-in compatibility with Passenger and its smart spawning functionality, so if you're using Passenger all you have to do is deploy and be happy!
-
-To add cassandra database creation and migrations steps to your Capistrano recipe, just add the following line to you deploy.rb:  
+To add cassandra database creation and migrations steps to your Capistrano recipe, add the following line to you deploy.rb:
 `require 'cassandra_migrations/capistrano'`
 
-# Acknowledgements
+## Acknowledgements
 
-This gem is built upon the [cql-rb](https://github.com/iconara/cql-rb) gem, and I thank Theo for doing an awesome job working on this gem for us.
-
-
+This gem is built upon the official [Ruby Driver for Apache Cassandra](https://github.com/datastax/ruby-driver) by DataStax.
+Which supersedes the [cql-rb](https://github.com/iconara/cql-rb) gem (thank you Theo for doing an awesome job).

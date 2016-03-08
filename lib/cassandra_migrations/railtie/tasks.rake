@@ -12,7 +12,7 @@ namespace :cassandra do
       CassandraMigrations::Cassandra.start!
       puts "Keyspace #{CassandraMigrations::Config.keyspace} already exists!"
     rescue CassandraMigrations::Errors::UnexistingKeyspaceError
-      CassandraMigrations::Cassandra.create_keyspace!
+      CassandraMigrations::Cassandra.create_keyspace!(Rails.env)
       puts "Created keyspace #{CassandraMigrations::Config.keyspace}"
     end
   end
@@ -20,7 +20,7 @@ namespace :cassandra do
   desc 'Drop keyspace in config/cassandra.yml for the current environment'
   task :drop do
     begin
-      CassandraMigrations::Cassandra.drop_keyspace!
+      CassandraMigrations::Cassandra.drop_keyspace!(Rails.env)
       puts "Dropped keyspace #{CassandraMigrations::Config.keyspace}"
     rescue CassandraMigrations::Errors::UnexistingKeyspaceError
       puts "Keyspace #{CassandraMigrations::Config.keyspace} does not exist... cannot be dropped"
@@ -51,18 +51,26 @@ namespace :cassandra do
     end
   end
 
-  desc 'Resets and prepares cassandra database (all data will be lost)'
+  namespace :migrate do
+    desc 'Resets and prepares cassandra database (all data will be lost)'
+    task :reset do
+      Rake::Task['cassandra:drop'].execute
+      Rake::Task['cassandra:create'].execute
+      Rake::Task['cassandra:migrate'].execute
+    end
+  end
+
   task :setup do
-    Rake::Task['cassandra:drop'].execute
+    puts "DEPRECATION WARNING: `cassandra:setup` rake task has been deprecated, use `cassandra:migrate:reset` instead"
     Rake::Task['cassandra:create'].execute
     Rake::Task['cassandra:migrate'].execute
   end
 
   namespace :test do
-    desc 'Load the development schema in to the test keyspace'
+    desc 'Load the development schema in to the test keyspace via a full reset'
     task :prepare do
       Rails.env = 'test'
-      Rake::Task['cassandra:setup'].execute
+      Rake::Task['cassandra:migrate:reset'].execute
     end
   end
 
@@ -70,5 +78,7 @@ namespace :cassandra do
   task :version => :start do
     puts "Current version: #{CassandraMigrations::Migrator.read_current_version}"
   end
+
+  task
 
 end
