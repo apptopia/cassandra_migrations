@@ -97,7 +97,7 @@ namespace :cassandra do
 
   desc 'Migrate to new schema of migrations'
   task :migrate_to_v2 do
-    Rake::Task['cassandra:create'].execute
+    #Rake::Task['cassandra:create'].execute
     Rake::Task['cassandra:start'].execute
     CassandraMigrations::Migrator.migrate_to_v2
   end
