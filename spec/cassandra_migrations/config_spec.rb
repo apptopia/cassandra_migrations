@@ -15,6 +15,17 @@ describe CassandraMigrations::Config do
     expect(CassandraMigrations::Config.replication).to eq({'class' => "SimpleStrategy", 'replication_factor' => 1 })
   end
 
+  it 'should fetch secondary_keyspaces in config for the right environment' do
+    allow(Rails).to receive(:root).and_return Pathname.new("spec/fixtures")
+    allow(Rails).to receive(:env).and_return ActiveSupport::StringInquirer.new("development")
+
+    expect(CassandraMigrations::Config.keyspace).to eq('cassandra_migrations_development')
+    expect(CassandraMigrations::Config.secondary_keyspaces).to eq(
+      [{"keyspace"=>"secondary_first_development", "replication"=>{"class"=>"SimpleStrategy", "replication_factor"=>1}}, 
+        {"keyspace"=>"secondary_second_development", "replication"=>{"class"=>"SimpleStrategy", "replication_factor"=>1}}
+    ])
+  end
+
   it 'should raise exception if there are no configs for environment' do
     allow(Rails).to receive(:root).and_return Pathname.new("spec/fixtures")
     allow(Rails).to receive(:env).and_return ActiveSupport::StringInquirer.new("fake_environment")

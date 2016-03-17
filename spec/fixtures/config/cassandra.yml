@@ -7,6 +7,15 @@ development:
     class: SimpleStrategy
     replication_factor: 1
 
+  secondary_keyspaces:
+    - keyspace: 'secondary_first_development'
+      replication:
+        class: 'SimpleStrategy'
+        replication_factor: 1
+    - keyspace: 'secondary_second_development'
+      replication:
+        class: 'SimpleStrategy'
+        replication_factor: 1
 test:
   hosts:
     - 127.0.0.1
@@ -16,6 +25,17 @@ test:
     class: 'SimpleStrategy'
     replication_factor: 1
 
+  secondary_keyspaces:
+    - keyspace: 'secondary_first_test'
+      replication:
+        class: 'SimpleStrategy'
+        replication_factor: 1
+
+    - keyspace: 'secondary_second_test'
+      replication:
+        class: 'SimpleStrategy'
+        replication_factor: 1
+        
 production:
   hosts:
     - 'cass1.my_app.biz'

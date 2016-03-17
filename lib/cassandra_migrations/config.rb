@@ -11,7 +11,7 @@ module CassandraMigrations
        :ssl, :server_cert, :client_cert, :private_key, :passphrase,
        :connect_timeout, :futures_factory]
 
-    FIELDS = CASSANDRA_CONNECTION_VALID_FIELDS.map(&:to_s) + %w(keyspace replication)
+    FIELDS = CASSANDRA_CONNECTION_VALID_FIELDS.map(&:to_s) + %w(keyspace replication secondary_keyspaces)
 
     Configuration = Struct.new(*FIELDS.map(&:to_sym))
 

@@ -162,6 +162,11 @@ module CassandraMigrations
         end
       end
 
+      def blob(column_name, options={})
+        @columns_name_type_hash[column_name.to_sym] = column_type_for(:blob, options)
+        raise Errors::MigrationDefinitionError, "blob cannot be primary key" if options[:primary_key]
+      end
+
       def list(column_name, options={})
         list_or_set(:list, column_name, options)
       end
@@ -213,7 +218,7 @@ module CassandraMigrations
                            :map, :set, :counter]
       TYPES_MAP = { string: :varchar,
                     datetime: :timestamp,
-                    binary: :blob }
+                    binary: :blob, blob: :blob }
 
       PRECISION_MAP = {
                         integer: { 4 => :int, 8 => :bigint, nil => :int },
@@ -247,7 +252,8 @@ module CassandraMigrations
           when :compact_storage
             cql_name
           else
-            "#{cql_name} = #{value}"
+            value_str = value.map {|k, v| "'#{k}':'#{v}'"}.join(',')
+            "#{cql_name} = {#{value_str}}"
         end
       end
 

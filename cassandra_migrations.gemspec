@@ -26,6 +26,8 @@ Gem::Specification.new do |s|
   # s.add_development_dependency: Development dependencies
   s.add_development_dependency 'rspec', '~> 3.1.0'
   s.add_development_dependency 'bundler', '~> 1.6'
+  s.add_development_dependency 'memfs'
+
 #  s.add_development_dependency 'simplecov', '~> 0.9'
 #  s.add_development_dependency 'coveralls', '~> 0.7'
 end

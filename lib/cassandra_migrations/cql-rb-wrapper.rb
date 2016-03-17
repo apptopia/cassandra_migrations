@@ -34,7 +34,7 @@ end
 
 class Client
   def self.connect(options)
-    Rails.logger.try(:info, "Connecting to Cassandra cluster: #{options}")
+    #Rails.logger.try(:info, "Connecting to Cassandra cluster: #{options}")
 
     unless @cluster = Cassandra.cluster(options)
       raise CassandraMigrations::Errors::ClusterError.new(options)
@@ -57,11 +57,11 @@ class Client
     @cluster = cluster
     @sessions = {}
     if keyspace
-      Rails.logger.try(:info, "Creating Cassandra session: #{keyspace.inspect}")
+      #Rails.logger.try(:info, "Creating Cassandra session: #{keyspace.inspect}")
       @session = cluster.connect(keyspace)
       @sessions[keyspace] = @session
     else
-      Rails.logger.try(:info, "Creating Cassandra session: [no keyspace]")
+      #Rails.logger.try(:info, "Creating Cassandra session: [no keyspace]")
       @session = @cluster.connect()
       @sessions[:default] = @session
     end
@@ -87,7 +87,7 @@ class Client
   end
 
   def close
-    Rails.logger.try(:info, "Closing Cassandra session: #{@session.inspect}")
+    #Rails.logger.try(:info, "Closing Cassandra session: #{@session.inspect}")
     @session.close
   end
 

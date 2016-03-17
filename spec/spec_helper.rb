@@ -9,7 +9,7 @@ require 'rails/all'
 
 require 'rspec'
 require 'cassandra_migrations'
-
+require 'memfs'
 # SimpleCov.command_name 'Unit Tests'
 # SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter[
 #   SimpleCov::Formatter::HTMLFormatter,

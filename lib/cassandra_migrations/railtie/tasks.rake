@@ -1,4 +1,5 @@
 # encoding : utf-8
+require 'colorize'
 
 namespace :cassandra do
 
@@ -6,22 +7,25 @@ namespace :cassandra do
     CassandraMigrations::Cassandra.start!
   end
 
-  desc 'Create the keyspace in config/cassandra.yml for the current environment'
+  desc 'Create main keyspace and secondary keyspaces in config/cassandra.yml for the current environment'
   task :create do
+
     begin
       CassandraMigrations::Cassandra.start!
       puts "Keyspace #{CassandraMigrations::Config.keyspace} already exists!"
+
+      #create secondary keyspaces
+      CassandraMigrations::Cassandra.create_secondary_keyspaces!(Rails.env)
+
     rescue CassandraMigrations::Errors::UnexistingKeyspaceError
-      CassandraMigrations::Cassandra.create_keyspace!(Rails.env)
-      puts "Created keyspace #{CassandraMigrations::Config.keyspace}"
+      CassandraMigrations::Cassandra.create_keyspaces!(Rails.env)
     end
   end
 
-  desc 'Drop keyspace in config/cassandra.yml for the current environment'
+  desc 'Drop main keyspace and secondary keyspaces in config/cassandra.yml for the current environment'
   task :drop do
     begin
-      CassandraMigrations::Cassandra.drop_keyspace!(Rails.env)
-      puts "Dropped keyspace #{CassandraMigrations::Config.keyspace}"
+      CassandraMigrations::Cassandra.drop_keyspaces!(Rails.env)
     rescue CassandraMigrations::Errors::UnexistingKeyspaceError
       puts "Keyspace #{CassandraMigrations::Config.keyspace} does not exist... cannot be dropped"
     end
@@ -29,36 +33,33 @@ namespace :cassandra do
 
   desc 'Migrate the keyspace to the latest version'
   task :migrate => :start do
-    migrations_up_count = CassandraMigrations::Migrator.up_to_latest!
-
-    if migrations_up_count == 0
-      puts "Already up-to-date"
-    else
-      puts "Migrated #{migrations_up_count} version(s) up."
-    end
+    keyspace = ENV['KEYSPACE']
+    CassandraMigrations::Migrator.up_to_latest!(keyspace)
   end
 
-  desc 'Rolls the schema back to the previous version (specify steps w/ STEP=n)'
+  desc 'Rolls the schema back to the previous version (specify steps w/ STEP=n and KEYSPACE=xxx)'
   task :rollback => :start do
     steps = (ENV['STEP'] ? ENV['STEP'].to_i : 1)
-
-    migrations_down_count = CassandraMigrations::Migrator.rollback!(steps)
-
-    if steps == migrations_down_count
-      puts "Rolled back #{steps} version(s)."
-    else
-      puts "Asked to rollback #{steps} version(s). Only achieved #{migrations_down_count}."
+    keyspace = ENV['KEYSPACE']
+    
+    unless keyspace
+      all_k = CassandraMigrations::Migrator.get_keyspaces_list
+      keyspace = all_k.first if all_k.size == 1
     end
+
+    raise "You have more than 1 keyspace. Please specify KEYSPACE=xxx" unless keyspace
+
+    CassandraMigrations::Migrator.rollback!(steps, keyspace)
   end
 
-  namespace :migrate do
-    desc 'Resets and prepares cassandra database (all data will be lost)'
-    task :reset do
-      Rake::Task['cassandra:drop'].execute
-      Rake::Task['cassandra:create'].execute
-      Rake::Task['cassandra:migrate'].execute
-    end
-  end
+  # namespace :migrate do
+  #   desc 'Resets and prepares cassandra database (all data will be lost)'
+  #   task :reset do
+  #     Rake::Task['cassandra:drop'].execute
+  #     Rake::Task['cassandra:create'].execute
+  #     Rake::Task['cassandra:migrate'].execute
+  #   end
+  # end
 
   task :setup do
     puts "DEPRECATION WARNING: `cassandra:setup` rake task has been deprecated, use `cassandra:migrate:reset` instead"
@@ -67,25 +68,37 @@ namespace :cassandra do
   end
 
   namespace :test do
-    desc 'Load the development schema in to the test keyspace via a full reset'
+    desc 'Load the development schema in to the test schema via cql structure'
     task :prepare do
       Rails.env = 'test'
-      Rake::Task['cassandra:migrate:reset'].execute
+      CassandraMigrations::SchemaDump.restore_keyspaces
     end
   end
 
+  desc 'clones structure into cql file for each keyspace'
+  task :clone_structure do
+    CassandraMigrations::SchemaDump.dump_for_all_keyspaces
+  end
+
+
   desc 'Retrieves the current schema version number'
   task :version => :start do
-    puts "Current version: #{CassandraMigrations::Migrator.read_current_version_v2}"
+    CassandraMigrations::Migrator.get_keyspaces_list.each do |keyspace|
+      puts "Current version for #{keyspace}: #{CassandraMigrations::Migrator.read_current_version_v2(keyspace)}"
+    end
   end
 
   desc 'Show missing migrations'
   task :missing => :start do
-    CassandraMigrations::Migrator.get_missing_migrations
+    CassandraMigrations::Migrator.get_keyspaces_list.each do |keyspace|
+      p "Missing for #{keyspace}: #{CassandraMigrations::Migrator.get_missing_migrations(keyspace)}"
+    end
   end
 
   desc 'Migrate to new schema of migrations'
-  task :migrate_to_v2 => :start do
+  task :migrate_to_v2 do
+    Rake::Task['cassandra:create'].execute
+    Rake::Task['cassandra:start'].execute
     CassandraMigrations::Migrator.migrate_to_v2
   end
 
