@@ -77,7 +77,7 @@ module CassandraMigrations
       connection_params = Config.connection_config_for_env
 
       begin
-        self.client = Client.connect(connection_params)
+        self.client = CqlClient.connect(connection_params)
       rescue Ione::Io::ConnectionError => e
         raise Errors::ConnectionError, e.message
       end

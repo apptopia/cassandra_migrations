@@ -3,7 +3,7 @@
 require 'cassandra'
 require 'ione'
 
-class PreparedStatement
+class CqlPreparedStatement
   attr_reader :statement
 
   def initialize(client, statement)
@@ -16,7 +16,7 @@ class PreparedStatement
   end
 end
 
-class BatchStatement
+class CqlBatchStatement
   def initialize(client, batch)
     @client = client
     @batch = batch
@@ -32,7 +32,7 @@ class BatchStatement
   end
 end
 
-class Client
+class CqlClient
   def self.connect(options)
     #Rails.logger.try(:info, "Connecting to Cassandra cluster: #{options}")
 
@@ -73,11 +73,11 @@ class Client
 
   def prepare(statement, options = {})
     s = @session.prepare(statement, options)
-    PreparedStatement.new(self, s)
+    CqlPreparedStatement.new(self, s)
   end
 
   def batch(type = :logged, options = {})
-    batch = BatchStatement.new(self, @session.send(:"#{type}_batch"))
+    batch = CqlBatchStatement.new(self, @session.send(:"#{type}_batch"))
     if block_given?
       yield(batch)
       batch.execute(options)
