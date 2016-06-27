@@ -25,6 +25,8 @@ module CassandraMigrations
 
       body = [drop_keyspace_cql, create_keyspace_cql, create_table_cqls.join("")].join("")
 
+      body.gsub!(%Q(AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'), ' ')
+
       mode = (@force_one_destination ? 'a' : 'w')
       File.open(@destination, mode){|f| f.write(body)}
 

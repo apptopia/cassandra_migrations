@@ -35,6 +35,7 @@ namespace :cassandra do
   task :migrate => :start do
     keyspace = ENV['KEYSPACE']
     CassandraMigrations::Migrator.up_to_latest!(keyspace)
+    Rake::Task['cassandra:clone_structure'].execute
   end
 
   desc 'Rolls the schema back to the previous version (specify steps w/ STEP=n and KEYSPACE=xxx)'
