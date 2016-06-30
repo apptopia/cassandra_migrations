@@ -23,7 +23,12 @@ module CassandraMigrations
       drop_keyspace_cql = "DROP KEYSPACE IF EXISTS #{@dest_keyspace};"
       create_table_cqls = donor.tables.map(&:to_cql).map{|r| r.gsub(@donor_keyspace, @dest_keyspace)}
 
-      body = [drop_keyspace_cql, create_keyspace_cql, create_table_cqls.join("")].join("")
+      create_indexes = donor.tables.map{|t| t.columns.select{|c| c.index}.map{|c| [t, c, c.index]}}.flatten(1).compact
+      create_indexes_cqls = create_indexes.map do |ind|
+        "CREATE INDEX IF NOT EXISTS #{ind[2].name} ON #{@dest_keyspace}.#{ind[0].name} (#{ind[1].name});"
+      end
+
+      body = [drop_keyspace_cql, create_keyspace_cql, create_table_cqls.join(""), create_indexes_cqls.join("")].join("")
 
       body.gsub!(%Q(AND caching = '{"keys":"ALL", "rows_per_partition":"NONE"}'), ' ')
 
